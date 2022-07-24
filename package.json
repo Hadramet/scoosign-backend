@@ -1,0 +1,11 @@
+{
+  "name": "scoosign-backend",
+  "version": "1.0.0",
+  "description": "Backend server for scoosign application.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "hadramet sylla",
+  "license": "ISC"
+}
