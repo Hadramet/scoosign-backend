@@ -6,6 +6,7 @@ const User = require("../models/user");
 
 router.post("/", (req, res) => {
   try {
+    console.log(["INFOS", "Post on /authorize .."]);
     User.findOne({ email: req.body.email }, function (err, user) {
       if (!user) {
         return res.status(400).send({
@@ -14,10 +15,14 @@ router.post("/", (req, res) => {
         });
       } else {
         if (user.validatePassword(req.body.password)) {
-          const token = jwt.sign({ uid: user.id }, process.env.JWT_SECRET, {
-            expiresIn: process.env.JWT_EXPIRES_IN,
-            algorithm: "HS256",
-          });
+          const token = jwt.sign(
+            { uid: user.id, urole: user.role },
+            process.env.JWT_SECRET,
+            {
+              expiresIn: process.env.JWT_EXPIRES_IN,
+              algorithm: "HS256",
+            }
+          );
           res.status(201).send({
             success: true,
             data: {
@@ -34,7 +39,7 @@ router.post("/", (req, res) => {
     });
   } catch (error) {
     console.log("[Auth Api]", error);
-    res.status(500).send({
+    res.status(error.statusCode || 500).send({
       success: false,
       message: "Internal server error",
     });
@@ -43,10 +48,7 @@ router.post("/", (req, res) => {
 
 router.post("/me", (req, res) => {
   try {
-    const token = req.header(process.env.JWT_TOKEN_HEADER_KEY);
-    if (!token) throw new Error("Invalid headers configuration");
-    const { uid } = jwt.decode(token);
-    User.findById(uid, function (err, user) {
+    User.findById(req.auth.uid, function (err, user) {
       if (!user) {
         return res.status(400).send({
           success: false,
@@ -66,7 +68,7 @@ router.post("/me", (req, res) => {
     });
   } catch (error) {
     console.log("[Auth Api]", error);
-    res.status(500).send({
+    res.status(error.statusCode || 500).send({
       success: false,
       message: "Internal server error",
     });
