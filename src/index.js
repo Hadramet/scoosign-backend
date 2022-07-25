@@ -23,7 +23,7 @@ app.use(express.json());
 app.use(jwtMiddleware());
 app.use(jwtErrorHandler);
 
-app.use("/api/v1/users/", require("./routes/users"));
+app.use("/api/v1/users", require("./routes/users"));
 app.use("/api/v1/authorize/", require("./routes/authorize"));
 
 const port = process.env.PORT || 5000;

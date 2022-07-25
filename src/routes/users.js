@@ -5,9 +5,12 @@ const router = express.Router();
 
 router.post("/", function (req, res) {
   try {
+    
+    console.log(["INFOS", "Post on /users .."]);
     if (!req.auth.uid || req.auth.urole !== 'admin') {
       return res.status(401).send({
         success: false,
+        failed: 'request',
         message: "Unauthorized token",
       });
     } else {
@@ -16,17 +19,18 @@ router.post("/", function (req, res) {
         if (user) {
           return res.status(400).send({
             success: false,
+            failed : 'email',
             message: "User already exist",
           });
         } else {
           const new_user = new User(body);
           new_user.setPassword(body.password);
-          const { uid } = jwt.decode(token);
-          new_user.created_by = uid;
+          new_user.created_by = req.auth.uid;
           new_user.save((err, User) => {
             if (err) {
               return res.status(error.statusCode || 400).send({
                 success: false,
+                failed: 'request',
                 message: err.message || "Failed to create user",
               });
             } else {
@@ -43,6 +47,7 @@ router.post("/", function (req, res) {
     console.log("[Users Api]", error);
     res.status(error.statusCode || 500).send({
       success: false,
+      failed : 'request',
       message: "Internal server error",
     });
   }
