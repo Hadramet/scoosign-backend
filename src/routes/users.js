@@ -64,34 +64,64 @@ router.get("/", function (req, res) {
         message: "Unauthorized token",
       });
     } else {
-      User.aggregate(
-        [
-          [
-            {
-              $project: {
-                name: { $concat: ["$firstName", " ", "$lastName"] },
-                email: true,
-                type: "$role",
-                active: 1,
-              },
+      console.log(req.query.filter);
+      console.log(req.query.rowsPerPage);
+      console.log(req.query.page);
+
+      const filter = req.query.filter || "all";
+      const rowsPerPage = Number(req.query.rowsPerPage) || 0;
+      const page = Number(req.query.page) || 1;
+
+      console.log(filter);
+      console.log(rowsPerPage);
+      console.log(page);
+
+      const agg = [];
+      if (filter !== "all") {
+        agg.push({
+          $match: {
+            role: {
+              $eq: filter,
             },
-          ],
-        ],
-        (err, users) => {
-          if (users) {
-            return res.status(200).send({
-              success: true,
-              data: users,
-            });
-          } else if (err) {
-            return res.status(error.statusCode || 400).send({
-              success: false,
-              failed: "request",
-              message: err.message || "Failed to retrieve the data",
-            });
-          }
+          },
+        });
+      }
+
+      if (page >> 1) {
+        agg.push({
+          $skip: page * rowsPerPage,
+        });
+      }
+
+      if (rowsPerPage >> 0) {
+        agg.push({
+          $limit: rowsPerPage,
+        });
+      }
+      agg.push({
+        $project: {
+          name: {
+            $concat: ["$firstName", " ", "$lastName"],
+          },
+          email: 1,
+          type: "$role",
+          active: 1,
+        },
+      });
+      User.aggregate(agg, (err, users) => {
+        if (users) {
+          return res.status(200).send({
+            success: true,
+            data: users,
+          });
+        } else if (err) {
+          return res.status(error.statusCode || 400).send({
+            success: false,
+            failed: "request",
+            message: err.message || "Failed to retrieve the data",
+          });
         }
-      );
+      });
     }
   } catch (error) {
     console.log("[GET/][users]", error);
