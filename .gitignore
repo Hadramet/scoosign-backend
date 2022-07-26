@@ -13,3 +13,4 @@ yarn-error.log*
 # vercel
 .vercel
 models/seed.mongodb
+.vscode/settings.json
