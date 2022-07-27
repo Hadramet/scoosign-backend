@@ -95,4 +95,8 @@ const uniqueValidator = function (error, doc, next) {
 UserSchema.post("updateOne", uniqueValidator);
 UserSchema.post("save", uniqueValidator);
 
+UserSchema.statics.deleteById = function(_id) {
+  return this.deleteOne({ _id: _id })
+};
+
 const User = (module.exports = mongoose.model("User", UserSchema));

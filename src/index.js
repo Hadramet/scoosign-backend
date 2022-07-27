@@ -1,6 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
+const { logErrors, clientErrorHandler } = require("./error-handlers");
 const {jwtMiddleware, jwtErrorHandler} = require("./middleware/jwt");
 
 const mongoString = process.env.MONGODB_URI;
@@ -17,14 +18,16 @@ database.once("connected", () => {
 });
 
 const app = express();
-
 app.use(express.json());
-
+// Middleware
 app.use(jwtMiddleware());
 app.use(jwtErrorHandler);
-
+// Routes
 app.use("/api/v1/users", require("./routes/users"));
 app.use("/api/v1/authorize/", require("./routes/authorize"));
+// Error Handlers
+app.use(logErrors)
+app.use(clientErrorHandler)
 
 const port = process.env.PORT || 5000;
 app.listen(port, () => {
