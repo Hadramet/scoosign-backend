@@ -19,30 +19,21 @@ router.post("/", function (req, res) {
       });
     } else {
       const { body } = req;
-      User.findOne({ email: body.email }, function (err, user) {
-        if (user) {
-          return res.status(400).send({
+      const new_user = new User(body);
+      new_user.setPassword(body.password);
+      new_user.created_by = req.auth.uid;
+      new_user.save((err, result) => {
+        if (err) {
+          return res.status(err.statusCode || 400).send({
             success: false,
-            failed: "email",
-            message: "User already exist",
+            failed: "request",
+            message: err.message || "Failed to create user",
           });
         } else {
-          const new_user = new User(body);
-          new_user.setPassword(body.password);
-          new_user.created_by = req.auth.uid;
-          new_user.save((err, User) => {
-            if (err) {
-              return res.status(error.statusCode || 400).send({
-                success: false,
-                failed: "request",
-                message: err.message || "Failed to create user",
-              });
-            } else {
-              return res.status(201).send({
-                success: true,
-                message: "User successfully created",
-              });
-            }
+          return res.status(201).send({
+            success: true,
+            message: "User successfully created",
+            data: result,
           });
         }
       });
@@ -182,11 +173,11 @@ router.get("/:userId", function (req, res) {
           return res.status(err.statusCode || 300).send({
             success: false,
             failed: "user",
-            message: "User not found",
+            message: err.message || "User not found",
           });
         } else if (user) {
           if (user.length === 0) {
-            return res.status( 300).send({
+            return res.status(300).send({
               success: false,
               failed: "user",
               message: "User not found",
@@ -201,7 +192,7 @@ router.get("/:userId", function (req, res) {
       }
     );
   } catch (error) {
-    console.log("[GET/][users]", error);
+    console.log("[GET/][users][id]", error);
     res.status(error.statusCode || 500).send({
       success: false,
       failed: "request",
@@ -209,10 +200,48 @@ router.get("/:userId", function (req, res) {
     });
   }
 });
-// TODO: PATCH user by id
-
+// TODO: PUT user by id
+router.put("/:userId", (req, res) => {
+  try {
+    console.log("[PUT/][users/:id]", "request");
+    const query = req.body;
+    User.updateOne(
+      { _id: mongoose.Types.ObjectId(req.params.userId) },
+      [{ $set: query }, { $set: { lastUpdate: "$$NOW" } }],
+      (err, result) => {
+        if (err) {
+          return res.status(err.statusCode || 404).send({
+            success: false,
+            failed: "user",
+            message: err.message || "User not found",
+          });
+        } else {
+          if (result.matchedCount >> 0) {
+            return res.status(200).send({
+              success: true,
+              message: "User successfully updated",
+              data: result,
+            });
+          } else {
+            return res.status(404).send({
+              success: false,
+              failed: "user",
+              message: "User not found",
+            });
+          }
+        }
+      }
+    );
+  } catch (error) {
+    console.log("[PUT/][users][id]", error);
+    res.status(error.statusCode || 500).send({
+      success: false,
+      failed: "request",
+      message: "Internal server error",
+    });
+  }
+});
 
 // TODO: DELETE user by id
-// TODO: PATCH user by id
 
 module.exports = router;
