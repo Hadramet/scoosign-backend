@@ -14,6 +14,7 @@ const UserSchema = mongoose.Schema({
   },
   email: {
     type: String,
+    unique: true,
     required: [true, "Please provide an user email."],
     maxLength: [255, "Last name cannot be more than 255 characters"],
   },
@@ -83,4 +84,15 @@ UserSchema.pre("save", function (next) {
   next();
 });
 
-const User = module.exports = mongoose.model('User', UserSchema); 
+const uniqueValidator = function (error, doc, next) {
+  if (error.name === "MongoServerError" && error.code === 11000) {
+    next(new Error("Email already exist"));
+  } else {
+    next(error);
+  }
+};
+
+UserSchema.post("updateOne", uniqueValidator);
+UserSchema.post("save", uniqueValidator);
+
+const User = (module.exports = mongoose.model("User", UserSchema));
