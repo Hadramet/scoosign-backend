@@ -6,7 +6,7 @@ const User = require("../models/user");
 
 router.post("/", (req, res) => {
   try {
-    console.log(["INFOS", "Post on /authorize .."]);
+    console.log("[POST/][authorize]", "request");
     User.findOne({ email: req.body.email }, function (err, user) {
       if (!user) {
         return res.status(400).send({

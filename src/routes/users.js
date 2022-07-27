@@ -2,7 +2,11 @@ const express = require("express");
 const User = require("../models/user");
 const jwt = require("jsonwebtoken");
 const router = express.Router();
+const mongoose = require("mongoose");
 
+/**
+ * Create a user
+ */
 router.post("/", function (req, res) {
   try {
     console.log("[POST/][users]", "Post on /users ..");
@@ -53,6 +57,13 @@ router.post("/", function (req, res) {
   }
 });
 
+/**
+ * Get all users basic informations
+ * @param query:
+ * - filter: user role ['admin', 'student',...]
+ * - rowsPerPage: number of items par page
+ * - page : current page
+ */
 router.get("/", function (req, res) {
   try {
     console.log("[GET/][users]", "request");
@@ -64,17 +75,9 @@ router.get("/", function (req, res) {
         message: "Unauthorized token",
       });
     } else {
-      console.log(req.query.filter);
-      console.log(req.query.rowsPerPage);
-      console.log(req.query.page);
-
       const filter = req.query.filter || "all";
       const rowsPerPage = Number(req.query.rowsPerPage) || 0;
       const page = Number(req.query.page) || 1;
-
-      console.log(filter);
-      console.log(rowsPerPage);
-      console.log(page);
 
       const agg = [];
       if (filter !== "all") {
@@ -132,5 +135,84 @@ router.get("/", function (req, res) {
     });
   }
 });
+
+// TODO: GET user by id
+router.get("/:userId", function (req, res) {
+  try {
+    console.log("[GET/][users]", "request");
+    User.aggregate(
+      [
+        {
+          $match: {
+            _id: mongoose.Types.ObjectId(req.params.userId),
+          },
+        },
+        {
+          $lookup: {
+            from: "users",
+            localField: "created_by",
+            foreignField: "_id",
+            as: "createdBy",
+          },
+        },
+        {
+          $unwind: {
+            path: "$createdBy",
+            preserveNullAndEmptyArrays: true,
+          },
+        },
+        {
+          $project: {
+            lastName: 1,
+            firstName: 1,
+            email: 1,
+            role: 1,
+            created_at: 1,
+            active: 1,
+            salt: 1,
+            hash: 1,
+            createdBy: {
+              $concat: ["$createdBy.firstName", " ", "$createdBy.lastName"],
+            },
+          },
+        },
+      ],
+      (err, user) => {
+        if (err) {
+          return res.status(err.statusCode || 300).send({
+            success: false,
+            failed: "user",
+            message: "User not found",
+          });
+        } else if (user) {
+          if (user.length === 0) {
+            return res.status( 300).send({
+              success: false,
+              failed: "user",
+              message: "User not found",
+            });
+          } else {
+            return res.status(200).send({
+              success: true,
+              data: user[0],
+            });
+          }
+        }
+      }
+    );
+  } catch (error) {
+    console.log("[GET/][users]", error);
+    res.status(error.statusCode || 500).send({
+      success: false,
+      failed: "request",
+      message: "Internal server error",
+    });
+  }
+});
+// TODO: PATCH user by id
+
+
+// TODO: DELETE user by id
+// TODO: PATCH user by id
 
 module.exports = router;
