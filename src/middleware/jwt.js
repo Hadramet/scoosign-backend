@@ -1,5 +1,6 @@
 const { expressjwt: expressJwt } = require("express-jwt");
 const { pathToRegexp } = require("path-to-regexp");
+const { ScooError } = require("../errors/scoo-error");
 
 const unprotected = [pathToRegexp("/api/v1/authorize")];
 
@@ -34,7 +35,8 @@ function jwtMiddleware() {
         }
         return null;
       } catch (error) {
-        throw new Error("[JWT Mid]", error.message);
+
+        throw new Scoo("jwt", error.message);
       }
     },
   }).unless({
@@ -44,9 +46,9 @@ function jwtMiddleware() {
 
 function jwtErrorHandler(err, req, res, next) {
   if (err.name === "UnauthorizedError") {
-    res.status(401).send({ success: false, message: err.message });
+    next(new ScooError( err.message, "user"));
   } else {
-    next(err);
+    next(new ScooError(err.message, "user"));
   }
 }
 

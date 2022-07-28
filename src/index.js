@@ -1,8 +1,8 @@
 require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
-const { logErrors, clientErrorHandler } = require("./error-handlers");
 const {jwtMiddleware, jwtErrorHandler} = require("./middleware/jwt");
+const {logErrors, clientErrorHandler} = require("./errors/error-handlers")
 
 const mongoString = process.env.MONGODB_URI;
 

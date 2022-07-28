@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const crypto = require("node:crypto");
+const {ScooError} = require("../errors/scoo-error")
 
 const UserSchema = mongoose.Schema({
   firstName: {
@@ -86,13 +87,14 @@ UserSchema.pre("save", function (next) {
 
 const uniqueValidator = function (error, doc, next) {
   if (error.name === "MongoServerError" && error.code === 11000) {
-    next(new Error("Email already exist"));
+    next(new ScooError("Email already exist", "email"));
   } else {
     next(error);
   }
 };
 
 UserSchema.post("updateOne", uniqueValidator);
+
 UserSchema.post("save", uniqueValidator);
 
 UserSchema.statics.deleteById = function(_id) {
