@@ -1,6 +1,6 @@
-const mongoose = require("mongoose");
-const crypto = require("node:crypto");
-const {ScooError} = require("../errors/scoo-error")
+import { mongoose } from "mongoose";
+import crypto from "node:crypto";
+import ScooError from "../errors/scoo-error.js";
 
 const UserSchema = mongoose.Schema({
   firstName: {
@@ -56,28 +56,28 @@ const UserSchema = mongoose.Schema({
   salt: { type: String },
 });
 
-const salt_length = 64;
+const saltLength = 64;
 const iterations = 1000;
-const pw_length = 255;
+const pwLength = 255;
 const digest = "sha256";
 const encoding = "hex";
 
 UserSchema.methods.setPassword = function (password) {
-  this.salt = crypto.randomBytes(salt_length).toString(encoding);
+  this.salt = crypto.randomBytes(saltLength).toString(encoding);
   this.hash = crypto
-    .pbkdf2Sync(password, this.salt, iterations, pw_length, digest)
+    .pbkdf2Sync(password, this.salt, iterations, pwLength, digest)
     .toString(encoding);
 };
 
 UserSchema.methods.validatePassword = function (password) {
-  var hash = crypto
-    .pbkdf2Sync(password, this.salt, iterations, pw_length, digest)
+  const hash = crypto
+    .pbkdf2Sync(password, this.salt, iterations, pwLength, digest)
     .toString(encoding);
   return this.hash === hash;
 };
 
 UserSchema.pre("save", function (next) {
-  let current = new Date();
+  const current = new Date();
   this.updated_at = current;
   if (!this.created_at) {
     this.created_at = current;
@@ -85,7 +85,7 @@ UserSchema.pre("save", function (next) {
   next();
 });
 
-const uniqueValidator = function (error, doc, next) {
+const uniqueValidator = (error, doc, next) => {
   if (error.name === "MongoServerError" && error.code === 11000) {
     next(new ScooError("Email already exist", "email"));
   } else {
@@ -97,8 +97,6 @@ UserSchema.post("updateOne", uniqueValidator);
 
 UserSchema.post("save", uniqueValidator);
 
-UserSchema.statics.deleteById = function(_id) {
-  return this.deleteOne({ _id: _id })
-};
+UserSchema.statics.deleteById = (_id) => this.deleteOne({ _id });
 
-const User = (module.exports = mongoose.model("User", UserSchema));
+export const User = mongoose.model("User", UserSchema);

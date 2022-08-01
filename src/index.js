@@ -1,8 +1,13 @@
-require("dotenv").config();
-const express = require("express");
-const mongoose = require("mongoose");
-const {jwtMiddleware, jwtErrorHandler} = require("./middleware/jwt");
-const {logErrors, clientErrorHandler} = require("./errors/error-handlers")
+import express, { json } from "express";
+import mongoose from "mongoose";
+import dotenv from "dotenv";
+import { logErrors, clientErrorHandler } from "./errors/error-handlers.js";
+import { jwtMiddleware } from "./middleware/jwt.js";
+import userRouter from "./routes/users.js";
+import authorizeRouter from "./routes/authorize.js";
+import ScooError from "./errors/scoo-error.js";
+
+dotenv.config();
 
 const mongoString = process.env.MONGODB_URI;
 
@@ -18,18 +23,38 @@ database.once("connected", () => {
 });
 
 const app = express();
-app.use(express.json());
+
 // Middleware
+app.use(json());
 app.use(jwtMiddleware());
-app.use(jwtErrorHandler);
+
 // Routes
-app.use("/api/v1/users", require("./routes/users"));
-app.use("/api/v1/authorize/", require("./routes/authorize"));
+app.use("/api/v1/authorize", authorizeRouter);
+app.use("/api/v1/users", userRouter);
+
+// Routes Not found
+app.use((req, res, next) => {
+  const error = new ScooError("Not found");
+  error.message = "Invalid route";
+  error.scope = "route";
+  error.status = 404;
+  next(error);
+});
 // Error Handlers
-app.use(logErrors)
-app.use(clientErrorHandler)
+app.use(logErrors);
+app.use(clientErrorHandler);
+app.use((err, req, res, next) => {
+  return res.status(err.status || 500).send({
+    success: false,
+    failed: err.scope || "request",
+    message: err.message || "Internal server error",
+  });
+});
 
 const port = process.env.PORT || 5000;
-app.listen(port, () => {
-  console.log(`Server started at port: ` + port);
+
+const server = app.listen(port, () => {
+  console.log(`Server listening on port ${server.address().port}`);
 });
+
+export default server;
