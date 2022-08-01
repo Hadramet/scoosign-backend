@@ -9,6 +9,14 @@ import ScooError from "./errors/scoo-error.js";
 
 dotenv.config();
 
+const required = ["MONGODB_URI", "JWT_SECRET", "JWT_TOKEN_HEADER_KEY"];
+
+for (const key of required) {
+  if (!process.env[key]) {
+    throw new Error(`Missing the environment variable "${key}"`);
+  }
+}
+
 const mongoString = process.env.MONGODB_URI;
 
 mongoose.connect(mongoString);
