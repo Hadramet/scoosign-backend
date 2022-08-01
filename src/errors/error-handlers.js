@@ -1,18 +1,23 @@
-const logErrors = function (err, req, res, next) {
-  console.error(err.stack);
-  next(err);
-};
-exports.logErrors = logErrors;
+import ScooError from './scoo-error.js'
 
-//TODO: find a way to customize error for client
-// Ex : new CustomError(scope, message)
-const clientErrorHandler = function (err, req, res, next) {
-  console.log('Error send to client');
-  console.log(err)
-  res.status(err.statusCode || 500).send({
-    success: false,
-    failed: err.scope,
-    message: err.message || "Internal server error",
-  });
-};
-exports.clientErrorHandler = clientErrorHandler;
+function logErrors(err, req, res, next) {
+    console.error(err.stack)
+    next(err)
+}
+
+// eslint-disable-next-line no-unused-vars
+function clientErrorHandler(err, req, res, next) {
+    if (req.xhr) {
+        res.status(400).send({
+            success: false,
+            failed: err.scope || 'request',
+            message: 'Bad request' + err.message,
+        })
+    } else if (err.name === 'UnauthorizedError') {
+        next(new ScooError('Invalid token', 'user'))
+    } else {
+        next(err)
+    }
+}
+
+export { logErrors, clientErrorHandler }
