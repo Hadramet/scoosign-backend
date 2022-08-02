@@ -1,8 +1,10 @@
 import express from 'express'
+import { getPaginatorDefaultOptions } from '../aggregation/getPaginatorDefaultOptions.js'
 import ScooError from '../errors/scoo-error.js'
 import { AdminAndAcademicPermissionHandler } from '../middleware/admin-authority.js'
 import { Group } from '../models/group.js'
 import { Student } from '../models/student.js'
+import { User } from '../models/user.js'
 
 const router = express.Router()
 
@@ -36,10 +38,37 @@ router.get('/:groupId', AdminAndAcademicPermissionHandler, (req, res, next) => {
             success: true,
             data: group,
         })
-    }).populate(
-        'parent created_by updated_by',
-        'name description firstName lastName'
-    )
+    }).populate('created_by updated_by', 'description firstName lastName')
+})
+
+router.get('/', AdminAndAcademicPermissionHandler, (req, res, next) => {
+    const aggregateQuery = Group.aggregate([
+        {
+            $lookup: {
+                from: User.collection.name,
+                localField: 'created_by',
+                foreignField: '_id',
+                as: 'createdBy',
+            },
+        },
+        {
+            $unwind: '$createdBy',
+        },
+        {
+            $project: {
+                'createdBy.salt': 0,
+                'createdBy.hash': 0,
+            },
+        },
+    ])
+    const options = getPaginatorDefaultOptions(req)
+    Group.aggregatePaginate(aggregateQuery, options, (err, result) => {
+        if (err) return next(new ScooError(err?.message, 'group'))
+        return res.status(200).send({
+            success: true,
+            data: result,
+        })
+    })
 })
 
 // name , description, parent, active

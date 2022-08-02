@@ -1,4 +1,5 @@
 import mongoose from 'mongoose'
+import aggregatePaginate from 'mongoose-aggregate-paginate-v2'
 import ScooError from '../errors/scoo-error.js'
 
 const GroupSchema = mongoose.Schema({
@@ -36,7 +37,6 @@ const GroupSchema = mongoose.Schema({
         ref: 'User',
     },
 })
-
 GroupSchema.pre('save', function (next) {
     const current = new Date()
     this.updated_at = current
@@ -45,7 +45,6 @@ GroupSchema.pre('save', function (next) {
     }
     next()
 })
-
 function uniqueValidator(error, doc, next) {
     if (error.name === 'MongoServerError' && error.code === 11000) {
         next(new ScooError('Group name already exist', 'group'))
@@ -53,7 +52,6 @@ function uniqueValidator(error, doc, next) {
         next(error)
     }
 }
-
 GroupSchema.post('save', uniqueValidator)
-
+GroupSchema.plugin(aggregatePaginate)
 export const Group = mongoose.model('Group', GroupSchema)
