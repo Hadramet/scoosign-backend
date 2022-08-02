@@ -70,16 +70,58 @@ router.get('/:studentId', (req, res, next) => {
     }).populate('user groups', 'firstName lastName email name')
 })
 
+const labels = {
+    totalDocs: 'itemCount',
+    docs: 'itemsList',
+    limit: 'rowsPerPage',
+    page: 'page',
+    nextPage: 'next',
+    prevPage: 'prev',
+    totalPages: 'pageCount',
+    hasPrevPage: 'hasPrev',
+    hasNextPage: 'hasNext',
+    pagingCounter: 'pageCounter',
+    meta: 'paginator',
+}
+
 // Get all
 // TODO : paginate with indexing solution
 router.get('/', AdminAndAcademicPermissionHandler, (req, res, next) => {
-    Student.find((err, students) => {
+    const aggregateQuery = Student.aggregate([
+        {
+            $lookup: {
+                from: User.collection.name,
+                localField: 'user',
+                foreignField: '_id',
+                as: 'user',
+            },
+        },
+        {
+            $unwind: '$user',
+        },
+        {
+            $project: {
+                'user.firstName': 1,
+                'user.lastName': 1,
+                'user._id': 1,
+                'user.email': 1,
+                groups: 1,
+            },
+        },
+    ])
+    const options = {
+        page: req.query.page || 1,
+        limit: req.query.limit || 10,
+        customLabels: labels,
+    }
+
+    Student.aggregatePaginate(aggregateQuery, options, (err, result) => {
         if (err) return next(new ScooError(err?.message, 'student'))
         return res.status(200).send({
             success: true,
-            data: students,
+            data: result,
         })
-    }).populate('user', 'firstName lastName email')
+    })
 })
 
 // groups

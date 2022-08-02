@@ -1,5 +1,6 @@
 import mongoose from 'mongoose'
 import ScooError from '../errors/scoo-error.js'
+import aggregatePaginate from 'mongoose-aggregate-paginate-v2'
 
 const StudentSchema = mongoose.Schema({
     user: {
@@ -25,4 +26,5 @@ function uniqueValidator(error, doc, next) {
 }
 StudentSchema.post('updateOne', uniqueValidator)
 StudentSchema.post('save', uniqueValidator)
+StudentSchema.plugin(aggregatePaginate)
 export const Student = mongoose.model('Student', StudentSchema)

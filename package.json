@@ -17,6 +17,7 @@
     "express-jwt": "latest",
     "jsonwebtoken": "latest",
     "mongoose": "latest",
+    "mongoose-aggregate-paginate-v2": "^1.0.6",
     "nodemon": "latest",
     "path-to-regexp": "latest"
   },
