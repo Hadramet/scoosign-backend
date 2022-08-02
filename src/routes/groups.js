@@ -8,14 +8,38 @@ import { User } from '../models/user.js'
 
 const router = express.Router()
 
-// name , description, parent
+// name , description, parent, subGroups = [id], students=[id]
 router.post('/', AdminAndAcademicPermissionHandler, (req, res, next) => {
     // get the parent : not res error
     const { body } = req
     const newGroup = new Group(body)
     newGroup.created_by = req.auth.uid
+    const subGroups = body.subGroups || []
+    const students = body.students || []
+    const docs = []
+
     newGroup.save((err, result) => {
         if (err) return next(new ScooError(err.message, err.scope || 'group'))
+
+        students.map((student) => {
+            Student.findByIdAndUpdate(
+                student,
+                { $addToSet: { groups: result._id } },
+                { new: true }
+            )
+        })
+
+        subGroups.map((group) => {
+            Group.findByIdAndUpdate(
+                group,
+                { parent: result._id },
+                { new: true },
+                (err, doc) => {
+                    //TODO
+                }
+            )
+        })
+
         return res.status(201).send({
             success: true,
             message: 'Group successfully created',
@@ -64,12 +88,54 @@ router.get('/', AdminAndAcademicPermissionHandler, (req, res, next) => {
     const options = getPaginatorDefaultOptions(req)
     Group.aggregatePaginate(aggregateQuery, options, (err, result) => {
         if (err) return next(new ScooError(err?.message, 'group'))
+
         return res.status(200).send({
             success: true,
             data: result,
         })
     })
 })
+
+router.get(
+    '/list/available',
+    AdminAndAcademicPermissionHandler,
+    (req, res, next) => {
+        const aggregateQuery = Group.aggregate([
+            {
+                $match: {
+                    parent: null,
+                    active: true,
+                },
+            },
+            {
+                $lookup: {
+                    from: User.collection.name,
+                    localField: 'created_by',
+                    foreignField: '_id',
+                    as: 'createdBy',
+                },
+            },
+            {
+                $unwind: '$createdBy',
+            },
+            {
+                $project: {
+                    'createdBy.salt': 0,
+                    'createdBy.hash': 0,
+                },
+            },
+        ])
+        const options = getPaginatorDefaultOptions(req)
+        Group.aggregatePaginate(aggregateQuery, options, (err, result) => {
+            if (err) return next(new ScooError(err?.message, 'group'))
+
+            return res.status(200).send({
+                success: true,
+                data: result,
+            })
+        })
+    }
+)
 
 // name , description, parent, active
 router.put('/:groupId', AdminAndAcademicPermissionHandler, (req, res, next) => {
@@ -111,10 +177,7 @@ router.post(
                 { $addToSet: { groups: groupId } },
                 { new: true },
                 (err, doc) => {
-                    if (err) {
-                        return next(new ScooError(err?.message, 'group'))
-                    }
-                    results.push(doc)
+                    // TODO
                 }
             )
         })
