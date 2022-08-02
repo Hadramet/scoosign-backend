@@ -55,16 +55,54 @@ router.post('/:userId', AdminAndAcademicPermissionHandler, (req, res, next) => {
     })
 })
 
+// Get student by id
 router.get('/:studentId', (req, res, next) => {
     const studentId = req.params.studentId
-    Student.findOne({ _id: studentId }, (err, user) => {
-        if (err || !user)
-            return next(new ScooError(err?.message || 'Not user found', 'user'))
+    Student.findOne({ _id: studentId }, (err, student) => {
+        if (err || !student)
+            return next(
+                new ScooError(err?.message || 'Not user found', 'student')
+            )
         return res.status(200).send({
             success: true,
-            data: user,
+            data: student,
+        })
+    }).populate('user groups', 'firstName lastName email name')
+})
+
+// Get all
+// TODO : paginate with indexing solution
+router.get('/', AdminAndAcademicPermissionHandler, (req, res, next) => {
+    Student.find((err, students) => {
+        if (err) return next(new ScooError(err?.message, 'student'))
+        return res.status(200).send({
+            success: true,
+            data: students,
         })
     }).populate('user', 'firstName lastName email')
 })
+
+// groups
+router.put(
+    '/:studentId',
+    AdminAndAcademicPermissionHandler,
+    (req, res, next) => {
+        const studentId = req.params.studentId
+        const { body } = req
+        Student.updateOne({ _id: studentId }, body, (err, result) => {
+            if (err)
+                return next(
+                    new ScooError(
+                        err.message || 'Unable to update',
+                        err.scope || 'students'
+                    )
+                )
+            return res.status(200).send({
+                success: true,
+                data: result,
+            })
+        })
+    }
+)
 
 export default router

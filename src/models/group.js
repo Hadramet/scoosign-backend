@@ -1,5 +1,5 @@
 import mongoose from 'mongoose'
-import ScooError from '../errors/scoo-error'
+import ScooError from '../errors/scoo-error.js'
 
 const GroupSchema = mongoose.Schema({
     name: {
@@ -15,6 +15,10 @@ const GroupSchema = mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Group',
     },
+    active: {
+        type: Boolean,
+        default: true,
+    },
     created_by: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
@@ -23,11 +27,28 @@ const GroupSchema = mongoose.Schema({
         type: Date,
         default: Date.now,
     },
+    updated_at: {
+        type: Date,
+        default: Date.now,
+    },
+    updated_by: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+    },
+})
+
+GroupSchema.pre('save', function (next) {
+    const current = new Date()
+    this.updated_at = current
+    if (!this.created_at) {
+        this.created_at = current
+    }
+    next()
 })
 
 function uniqueValidator(error, doc, next) {
     if (error.name === 'MongoServerError' && error.code === 11000) {
-        next(new ScooError('Group name already exist', 'name'))
+        next(new ScooError('Group name already exist', 'group'))
     } else {
         next(error)
     }

@@ -8,6 +8,8 @@ import getUserListAgg from '../aggregation/get-user-list-agg.js'
 
 const router = express.Router()
 
+// TODO: (global) remove complex aggregation if necessary and use mongoose populate instead
+
 router.post('/', AdminPermissionHandler, (req, res, next) => {
     const { body } = req
     const newUser = new User(body)
@@ -77,6 +79,7 @@ router.put('/:userId', (req, res, next) => {
     )
 })
 
+// TODO : for RGPD delete all object that ref the user
 router.delete('/:userId', AdminPermissionHandler, (req, res, next) => {
     User.deleteOne({ _id: req.params.userId }, (err, result) => {
         if (err) return next(err)
