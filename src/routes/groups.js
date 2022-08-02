@@ -1,5 +1,5 @@
 import express from 'express'
-import { getPaginatorDefaultOptions } from '../aggregation/getPaginatorDefaultOptions.js'
+import { getPaginatorDefaultOptions } from '../aggregation/get-paginator-default.js'
 import ScooError from '../errors/scoo-error.js'
 import { AdminAndAcademicPermissionHandler } from '../middleware/admin-authority.js'
 import { Group } from '../models/group.js'

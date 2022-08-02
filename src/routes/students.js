@@ -3,8 +3,8 @@ import ScooError from '../errors/scoo-error.js'
 import { AdminAndAcademicPermissionHandler } from '../middleware/admin-authority.js'
 import { Student } from '../models/student.js'
 import { User } from '../models/user.js'
-import { getPaginatorDefaultOptions } from '../aggregation/getPaginatorDefaultOptions.js'
-import { getStudentAgg } from '../aggregation/getStudentAgg.js'
+import { getPaginatorDefaultOptions } from '../aggregation/get-paginator-default.js'
+import { getStudentAgg } from '../aggregation/get-student-list-agg.js'
 
 const router = express.Router()
 

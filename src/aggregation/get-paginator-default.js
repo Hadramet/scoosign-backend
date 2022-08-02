@@ -1,4 +1,4 @@
-import { labels } from '../aggregation/labels.js'
+import { labels } from './labels.js'
 
 export function getPaginatorDefaultOptions(req) {
     return {
