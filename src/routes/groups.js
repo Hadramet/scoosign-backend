@@ -126,7 +126,7 @@ router.get(
         const aggregateQuery = Group.aggregate([
             {
                 $match: {
-                    $or: [
+                    $and: [
                         { parent: { $eq: null } },
                         { active: { $ne: false } },
                     ],
