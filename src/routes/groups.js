@@ -49,6 +49,7 @@ router.post('/', AdminAndAcademicPermissionHandler, (req, res, next) => {
     })
 })
 
+// Get a group by id
 router.get('/:groupId', AdminAndAcademicPermissionHandler, (req, res, next) => {
     const groupId = req.params.groupId
     Group.aggregate(
@@ -135,6 +136,7 @@ router.get('/:groupId', AdminAndAcademicPermissionHandler, (req, res, next) => {
     )
 })
 
+// Get all groups
 router.get('/', AdminAndAcademicPermissionHandler, (req, res, next) => {
     const aggregateQuery = Group.aggregate([
         {
@@ -189,6 +191,7 @@ router.get('/', AdminAndAcademicPermissionHandler, (req, res, next) => {
     })
 })
 
+// Get groups that have as parent the current groupId
 router.get(
     '/subGroups/:groupId',
     AdminAndAcademicPermissionHandler,
@@ -228,6 +231,7 @@ router.get(
     }
 )
 
+// Get groups that have not parent
 router.get(
     '/list/available',
     AdminAndAcademicPermissionHandler,
@@ -271,7 +275,7 @@ router.get(
     }
 )
 
-// name , description, parent, active
+// Update a group infos
 router.put('/:groupId', AdminAndAcademicPermissionHandler, (req, res, next) => {
     const groupId = req.params.groupId
     const { body } = req
@@ -293,7 +297,6 @@ router.put('/:groupId', AdminAndAcademicPermissionHandler, (req, res, next) => {
 })
 
 // set students to group
-// students : [ids]
 // BUG : we do not get the errors and result correctly
 router.post(
     '/:groupId',
@@ -320,6 +323,55 @@ router.post(
         res.status(200).send({
             success: true,
             data: results,
+        })
+    }
+)
+
+// Get students that belong to some group id
+router.get(
+    '/:groupId/students',
+    AdminAndAcademicPermissionHandler,
+    (req, res, next) => {
+        const groupId = req.params.groupId
+        const aggregateQuery = Student.aggregate([
+            {
+                $match: {
+                    $and: [
+                        {
+                            groups: {
+                                $exists: true,
+                                $in: [mongoose.Types.ObjectId(groupId)],
+                            },
+                        },
+                    ],
+                },
+            },
+            {
+                $lookup: {
+                    from: User.collection.name,
+                    localField: 'user',
+                    foreignField: '_id',
+                    as: 'user',
+                },
+            },
+            {
+                $unwind: '$user',
+            },
+            {
+                $project: {
+                    'user.firstName': 1,
+                    'user.lastName': 1,
+                    'user.email': 1,
+                },
+            },
+        ])
+        const options = getPaginatorDefaultOptions(req)
+        Student.aggregatePaginate(aggregateQuery, options, (err, result) => {
+            if (err) return next(new ScooError(err?.message, 'group'))
+            return res.status(200).send({
+                success: true,
+                data: result,
+            })
         })
     }
 )
