@@ -76,6 +76,30 @@ router.get('/', AdminAndAcademicPermissionHandler, (req, res, next) => {
             },
         },
         {
+            $lookup: {
+                from: Student.collection.name,
+                let: { gid: '$_id' },
+                pipeline: [
+                    {
+                        $match: {
+                            $expr: {
+                                $in: ['$$gid', '$groups'],
+                            },
+                        },
+                    },
+                ],
+                as: 'students',
+            },
+        },
+        {
+            $lookup: {
+                from: Group.collection.name,
+                localField: '_id',
+                foreignField: 'parent',
+                as: 'child',
+            },
+        },
+        {
             $unwind: '$createdBy',
         },
         {
@@ -88,7 +112,6 @@ router.get('/', AdminAndAcademicPermissionHandler, (req, res, next) => {
     const options = getPaginatorDefaultOptions(req)
     Group.aggregatePaginate(aggregateQuery, options, (err, result) => {
         if (err) return next(new ScooError(err?.message, 'group'))
-
         return res.status(200).send({
             success: true,
             data: result,
@@ -103,8 +126,10 @@ router.get(
         const aggregateQuery = Group.aggregate([
             {
                 $match: {
-                    parent: null,
-                    active: true,
+                    $or: [
+                        { parent: { $eq: null } },
+                        { active: { $ne: false } },
+                    ],
                 },
             },
             {
