@@ -1,4 +1,5 @@
 import express from 'express'
+import mongoose from 'mongoose'
 import { getPaginatorDefaultOptions } from '../aggregation/get-paginator-default.js'
 import ScooError from '../errors/scoo-error.js'
 import { AdminAndAcademicPermissionHandler } from '../middleware/admin-authority.js'
@@ -50,19 +51,88 @@ router.post('/', AdminAndAcademicPermissionHandler, (req, res, next) => {
 
 router.get('/:groupId', AdminAndAcademicPermissionHandler, (req, res, next) => {
     const groupId = req.params.groupId
-    Group.findOne({ _id: groupId }, (err, group) => {
-        if (err || !group)
-            return next(
-                new ScooError(
-                    err?.message || 'Group not found',
-                    err?.scope || 'group'
+    Group.aggregate(
+        [
+            {
+                $match: {
+                    _id: mongoose.Types.ObjectId(groupId.toString()),
+                },
+            },
+            {
+                $lookup: {
+                    from: Group.collection.name,
+                    localField: '_id',
+                    foreignField: 'parent',
+                    as: 'child',
+                },
+            },
+            {
+                $lookup: {
+                    from: Student.collection.name,
+                    let: { gid: '$_id' },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $in: ['$$gid', '$groups'],
+                                },
+                            },
+                        },
+                    ],
+                    as: 'students',
+                },
+            },
+            {
+                $lookup: {
+                    from: User.collection.name,
+                    localField: 'created_by',
+                    foreignField: '_id',
+                    as: 'created_by',
+                },
+            },
+            {
+                $lookup: {
+                    from: User.collection.name,
+                    localField: 'updated_by',
+                    foreignField: '_id',
+                    as: 'updated_by',
+                },
+            },
+            {
+                $unwind: {
+                    path: '$created_by',
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $unwind: {
+                    path: '$updated_by',
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $project: {
+                    'created_by.salt': 0,
+                    'created_by.hash': 0,
+                    'updated_by.salt': 0,
+                    'updated_by.hash': 0,
+                },
+            },
+        ],
+        (err, group) => {
+            if (err || !group)
+                return next(
+                    new ScooError(
+                        err?.message || 'Group not found',
+                        err?.scope || 'group'
+                    )
                 )
-            )
-        return res.status(200).send({
-            success: true,
-            data: group,
-        })
-    }).populate('created_by updated_by', 'description firstName lastName')
+            return res.status(200).send({
+                success: true,
+                data: group[0],
+            })
+        }
+    )
 })
 
 router.get('/', AdminAndAcademicPermissionHandler, (req, res, next) => {
@@ -120,6 +190,45 @@ router.get('/', AdminAndAcademicPermissionHandler, (req, res, next) => {
 })
 
 router.get(
+    '/subGroups/:groupId',
+    AdminAndAcademicPermissionHandler,
+    (req, res, next) => {
+        const groupId = req.params.groupId
+        const aggregateQuery = Group.aggregate([
+            {
+                $match: {
+                    parent: mongoose.Types.ObjectId(groupId.toString()),
+                },
+            },
+            {
+                $lookup: {
+                    from: Student.collection.name,
+                    let: { gid: '$_id' },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $in: ['$$gid', '$groups'],
+                                },
+                            },
+                        },
+                    ],
+                    as: 'students',
+                },
+            },
+        ])
+        const options = getPaginatorDefaultOptions(req)
+        Group.aggregatePaginate(aggregateQuery, options, (err, result) => {
+            if (err) return next(new ScooError(err?.message, 'group'))
+            return res.status(200).send({
+                success: true,
+                data: result,
+            })
+        })
+    }
+)
+
+router.get(
     '/list/available',
     AdminAndAcademicPermissionHandler,
     (req, res, next) => {
@@ -167,6 +276,7 @@ router.put('/:groupId', AdminAndAcademicPermissionHandler, (req, res, next) => {
     const groupId = req.params.groupId
     const { body } = req
     body.updated_by = req.auth.uid
+    if (body.parent === '') body.parent = null
     Group.updateOne({ _id: groupId }, body, (err, result) => {
         if (err)
             return next(
