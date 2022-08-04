@@ -1,10 +1,14 @@
 import express from 'express'
 import mongoose from 'mongoose'
 import { User } from '../models/user.js'
-import { AdminPermissionHandler } from '../middleware/admin-authority.js'
+import {
+    AdminAndAcademicPermissionHandler,
+    AdminPermissionHandler,
+} from '../middleware/admin-authority.js'
 import getUserByIdAgg from '../aggregation/get-user-byid-agg.js'
 import ScooError from '../errors/scoo-error.js'
 import getUserListAgg from '../aggregation/get-user-list-agg.js'
+import generator from 'generate-password'
 
 const router = express.Router()
 
@@ -54,6 +58,30 @@ router.get('/:userId', (req, res, next) => {
         })
     })
 })
+
+router.post(
+    '/:userId/reset-password',
+    AdminAndAcademicPermissionHandler,
+    async (req, res, next) => {
+        const userId = req.params.userId
+        const user = await User.findById(userId)
+        const newPassword = generator.generate({
+            length: 12,
+            uppercase: true,
+            lowercase: true,
+            symbols: true,
+            numbers: true,
+        })
+        user.setPassword(newPassword)
+        user.save((err) => {
+            if (err) return next(new ScooError(err.message, 'user'))
+            return res.status(200).send({
+                success: true,
+                data: newPassword,
+            })
+        })
+    }
+)
 
 router.put('/:userId', (req, res, next) => {
     /**
