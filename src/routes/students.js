@@ -171,21 +171,15 @@ router.put(
         const { body } = req
         if (!body.groups)
             return next(new ScooError('Missing groups field', 'student'))
-        Student.aggregate(
-            [
-                {
-                    $match: {
-                        _id: mongoose.Types.ObjectId(studentId),
+        Student.updateOne(
+            { _id: mongoose.Types.ObjectId(studentId) },
+            {
+                $addToSet: {
+                    groups: {
+                        $each: body.groups,
                     },
                 },
-                {
-                    $set: {
-                        groups: {
-                            $concatArrays: ['$groups', body.groups],
-                        },
-                    },
-                },
-            ],
+            },
             (err, result) => {
                 if (err)
                     return next(
