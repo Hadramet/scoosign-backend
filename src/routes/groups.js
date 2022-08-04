@@ -141,6 +141,9 @@ router.get('/:groupId', AdminAndAcademicPermissionHandler, (req, res, next) => {
 router.get('/', AdminAndAcademicPermissionHandler, (req, res, next) => {
     const aggregateQuery = Group.aggregate([
         {
+            $sort: { created_at: -1 },
+        },
+        {
             $lookup: {
                 from: User.collection.name,
                 localField: 'created_by',
