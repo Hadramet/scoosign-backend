@@ -20,6 +20,7 @@ export function getStudentAgg() {
                 'user.lastName': 1,
                 'user._id': 1,
                 'user.email': 1,
+                'user.active': 1,
                 groups: 1,
             },
         },
