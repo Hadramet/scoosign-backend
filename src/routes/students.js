@@ -5,6 +5,8 @@ import { Student } from '../models/student.js'
 import { User } from '../models/user.js'
 import { getPaginatorDefaultOptions } from '../aggregation/get-paginator-default.js'
 import { getStudentAgg } from '../aggregation/get-student-list-agg.js'
+import { Group } from '../models/group.js'
+import mongoose from 'mongoose'
 
 const router = express.Router()
 
@@ -69,7 +71,7 @@ router.get('/:studentId', (req, res, next) => {
             success: true,
             data: student,
         })
-    }).populate('user groups', 'firstName lastName email name')
+    }).populate('user groups', 'firstName lastName email name active')
 })
 
 // Get all
@@ -85,6 +87,59 @@ router.get('/', AdminAndAcademicPermissionHandler, (req, res, next) => {
         })
     })
 })
+
+router.get(
+    '/:studentId/groups',
+    AdminAndAcademicPermissionHandler,
+    (req, res, next) => {
+        const studentId = req.params.studentId
+        const aggregateQuery = Student.aggregate([
+            {
+                $match: {
+                    _id: mongoose.Types.ObjectId(studentId.toString()),
+                },
+            },
+            {
+                $lookup: {
+                    from: Group.collection.name,
+                    localField: 'groups',
+                    foreignField: '_id',
+                    as: 'groups',
+                },
+            },
+            {
+                $unwind: {
+                    path: '$groups',
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+            {
+                $match: {
+                    groups: {
+                        $exists: true,
+                        $not: {
+                            $type: 'array',
+                        },
+                    },
+                },
+            },
+            {
+                $replaceRoot: {
+                    newRoot: '$groups',
+                },
+            },
+        ])
+
+        const options = getPaginatorDefaultOptions(req)
+        Student.aggregatePaginate(aggregateQuery, options, (err, result) => {
+            if (err) return next(new ScooError(err?.message, 'student'))
+            return res.status(200).send({
+                success: true,
+                data: result,
+            })
+        })
+    }
+)
 
 // groups
 router.put(
@@ -106,6 +161,76 @@ router.put(
                 data: result,
             })
         })
+    }
+)
+router.put(
+    '/:studentId/add-groups',
+    AdminAndAcademicPermissionHandler,
+    (req, res, next) => {
+        const studentId = req.params.studentId
+        const { body } = req
+        if (!body.groups)
+            return next(new ScooError('Missing groups field', 'student'))
+        Student.aggregate(
+            [
+                {
+                    $match: {
+                        _id: mongoose.Types.ObjectId(studentId),
+                    },
+                },
+                {
+                    $set: {
+                        groups: {
+                            $concatArrays: ['$groups', body.groups],
+                        },
+                    },
+                },
+            ],
+            (err, result) => {
+                if (err)
+                    return next(
+                        new ScooError(
+                            err.message || 'Unable to update',
+                            err.scope || 'students'
+                        )
+                    )
+                return res.status(200).send({
+                    success: true,
+                    data: result,
+                })
+            }
+        )
+    }
+)
+router.patch(
+    '/:studentId/remove-group',
+    AdminAndAcademicPermissionHandler,
+    (req, res, next) => {
+        const studentId = req.params.studentId
+        const { body } = req
+        if (!body.groups)
+            return next(new ScooError('Missing groups field', 'student'))
+        Student.findByIdAndUpdate(
+            studentId,
+            {
+                $pullAll: {
+                    groups: body.groups,
+                },
+            },
+            (err, result) => {
+                if (err)
+                    return next(
+                        new ScooError(
+                            err.message || 'Unable to update',
+                            err.scope || 'students'
+                        )
+                    )
+                return res.status(200).send({
+                    success: true,
+                    data: result,
+                })
+            }
+        )
     }
 )
 
