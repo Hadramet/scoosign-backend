@@ -13,6 +13,7 @@ const router = express.Router()
 router.post('/', AdminAndAcademicPermissionHandler, (req, res, next) => {
     // get the parent : not res error
     const { body } = req
+    if (body.parent === '') body.parent = null
     const newGroup = new Group(body)
     newGroup.created_by = req.auth.uid
     const subGroups = body.subGroups || []
@@ -281,6 +282,30 @@ router.put('/:groupId', AdminAndAcademicPermissionHandler, (req, res, next) => {
     const { body } = req
     body.updated_by = req.auth.uid
     if (body.parent === '') body.parent = null
+    if (body.subGroups) {
+        body.subGroups.map((group) => {
+            Group.findByIdAndUpdate(
+                group,
+                { parent: groupId },
+                { new: true },
+                (err, doc) => {
+                    //TODO
+                }
+            )
+        })
+    }
+    if (body.students) {
+        body.students.map((student) => {
+            Student.findByIdAndUpdate(
+                student,
+                { $addToSet: { groups: groupId } },
+                { new: true },
+                (err, doc) => {
+                    // TODO
+                }
+            )
+        })
+    }
     Group.updateOne({ _id: groupId }, body, (err, result) => {
         if (err)
             return next(
@@ -297,7 +322,7 @@ router.put('/:groupId', AdminAndAcademicPermissionHandler, (req, res, next) => {
 })
 
 // set students to group
-// BUG : we do not get the errors and result correctly
+// DEPRECATED : we do not get the errors and result correctly
 router.post(
     '/:groupId',
     AdminAndAcademicPermissionHandler,
