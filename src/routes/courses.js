@@ -1,5 +1,6 @@
 import express from 'express'
 import mongoose from 'mongoose'
+import { getPaginatorDefaultOptions } from '../aggregation/get-paginator-default.js'
 import ScooError from '../errors/scoo-error.js'
 import { AdminAndAcademicPermissionHandler } from '../middleware/admin-authority.js'
 import {
@@ -9,6 +10,8 @@ import {
 } from '../models/course.js'
 import { Group } from '../models/group.js'
 import { Student } from '../models/student.js'
+import { Teacher } from '../models/teacher.js'
+import { User } from '../models/user.js'
 const router = express.Router()
 
 // TODO : create new course
@@ -157,4 +160,81 @@ router.get(
         )
     }
 )
+
+router.get('/', AdminAndAcademicPermissionHandler, (req, res, next) => {
+    const aggregateQuery = Course.aggregate([
+        {
+            $lookup: {
+                from: Group.collection.name,
+                let: {
+                    g: '$groups',
+                },
+                pipeline: [
+                    {
+                        $match: {
+                            $expr: {
+                                $in: ['$_id', '$$g'],
+                            },
+                        },
+                    },
+                    {
+                        $project: {
+                            _id: 1,
+                            name: 1,
+                        },
+                    },
+                ],
+                as: 'groups',
+            },
+        },
+        {
+            $lookup: {
+                from: Teacher.collection.name,
+                let: { tid: '$teacher' },
+                pipeline: [
+                    {
+                        $match: {
+                            $expr: {
+                                $eq: ['$_id', '$$tid'],
+                            },
+                        },
+                    },
+                    {
+                        $lookup: {
+                            from: User.collection.name,
+                            localField: 'user',
+                            foreignField: '_id',
+                            as: 'user',
+                        },
+                    },
+                    {
+                        $unwind: '$user',
+                    },
+                    {
+                        $project: {
+                            userId: '$user._id',
+                            specialty: 1,
+                            firstName: '$user.firstName',
+                            lastName: '$user.lastName',
+                            email: '$user.email',
+                            active: '$user.active',
+                        },
+                    },
+                ],
+                as: 'teacher',
+            },
+        },
+        {
+            $unwind: '$teacher', //TODO: if multiple teacher can be added remove this
+        },
+    ])
+    const options = getPaginatorDefaultOptions(req)
+    Course.aggregatePaginate(aggregateQuery, options, (err, result) => {
+        if (err) return next(new ScooError(err?.message, 'student'))
+        return res.status(200).send({
+            success: true,
+            data: result,
+        })
+    })
+})
 export default router
