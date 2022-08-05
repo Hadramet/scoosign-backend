@@ -7,6 +7,8 @@ import userRouter from './routes/users.js'
 import authorizeRouter from './routes/authorize.js'
 import studentsRouter from './routes/students.js'
 import groupsRouter from './routes/groups.js'
+import coursesRouter from './routes/courses.js'
+import teachersRouter from './routes/teachers.js'
 import ScooError from './errors/scoo-error.js'
 
 dotenv.config()
@@ -43,6 +45,8 @@ app.use('/api/v1/authorize', authorizeRouter)
 app.use('/api/v1/users', userRouter)
 app.use('/api/v1/students', studentsRouter)
 app.use('/api/v1/groups', groupsRouter)
+app.use('/api/v1/teachers', teachersRouter)
+app.use('/api/v1/courses', coursesRouter)
 
 // Routes Not found
 app.use((req, res, next) => {
