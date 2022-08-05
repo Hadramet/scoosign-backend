@@ -4,6 +4,7 @@ import generator from 'generate-password'
 import { Teacher } from '../models/teacher.js'
 import { AdminAndAcademicPermissionHandler } from '../middleware/admin-authority.js'
 import ScooError from '../errors/scoo-error.js'
+import { getPaginatorDefaultOptions } from '../aggregation/get-paginator-default.js'
 const router = express.Router()
 
 // Add new teacher
@@ -40,6 +41,53 @@ router.post('/', AdminAndAcademicPermissionHandler, (req, res, next) => {
         })
     })
 })
-// TODO : delete teacher
+
+router.get('/', AdminAndAcademicPermissionHandler, (req, res, next) => {
+    const aggregateQuery = Teacher.aggregate([
+        {
+            $lookup: {
+                from: User.collection.name,
+                localField: 'user',
+                foreignField: '_id',
+                as: 'user',
+            },
+        },
+        {
+            $unwind: '$user',
+        },
+        {
+            $project: {
+                'user.firstName': 1,
+                'user.lastName': 1,
+                'user._id': 1,
+                'user.email': 1,
+                'user.active': 1,
+                specialty: 1,
+            },
+        },
+    ])
+    const options = getPaginatorDefaultOptions(req)
+    Teacher.aggregatePaginate(aggregateQuery, options, (err, result) => {
+        if (err) return next(new ScooError(err?.message, 'teacher'))
+        return res.status(200).send({
+            success: true,
+            data: result,
+        })
+    })
+})
+
+router.get('/:teacherId', (req, res, next) => {
+    const teacherId = req.params.teacherId
+    Teacher.findOne({ _id: teacherId }, (err, teacher) => {
+        if (err || !teacher)
+            return next(
+                new ScooError(err?.message || 'Not user found', 'teacher')
+            )
+        return res.status(200).send({
+            success: true,
+            data: teacher,
+        })
+    }).populate('user', 'firstName lastName email active')
+})
 
 export default router
