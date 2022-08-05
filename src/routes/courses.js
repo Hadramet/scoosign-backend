@@ -2,7 +2,11 @@ import express from 'express'
 import mongoose from 'mongoose'
 import ScooError from '../errors/scoo-error.js'
 import { AdminAndAcademicPermissionHandler } from '../middleware/admin-authority.js'
-import { Course } from '../models/course.js'
+import {
+    Course,
+    StudentAttendance,
+    TeacherAttendance,
+} from '../models/course.js'
 import { Group } from '../models/group.js'
 import { Student } from '../models/student.js'
 const router = express.Router()
@@ -25,8 +29,7 @@ router.post('/', AdminAndAcademicPermissionHandler, (req, res, next) => {
             },
             {
                 $project: {
-                    studentId: '$_id',
-                    _id: 0,
+                    _id: 1,
                 },
             },
             {
@@ -47,6 +50,34 @@ router.post('/', AdminAndAcademicPermissionHandler, (req, res, next) => {
                     )
                 )
             newCourse.students = stu
+            const stuAtt = []
+            stu.map((student) =>
+                stuAtt.push(
+                    new StudentAttendance({
+                        studentId: student._id,
+                        courseId: newCourse._id,
+                    })
+                )
+            )
+            StudentAttendance.insertMany(stuAtt, (err, res) => {
+                if (err)
+                    return next(
+                        new ScooError(err.message, err.scope || 'course')
+                    )
+            })
+            TeacherAttendance.create(
+                {
+                    teacherId: req.body.teacher,
+                    courseId: newCourse._id,
+                },
+                (err, res) => {
+                    if (err)
+                        return next(
+                            new ScooError(err.message, err.scope || 'course')
+                        )
+                }
+            )
+
             newCourse.save((err, result) => {
                 if (err)
                     return next(
@@ -60,15 +91,6 @@ router.post('/', AdminAndAcademicPermissionHandler, (req, res, next) => {
             })
         }
     )
-
-    // newCourse.save((err, result) => {
-    //     if (err) return next(new ScooError(err.message, err.scope || 'course'))
-    //     return res.status(201).send({
-    //         success: true,
-    //         message: 'Course successfully created',
-    //         data: result,
-    //     })
-    // })
 })
 
 router.get(
@@ -99,6 +121,25 @@ router.get(
                         as: 'groups',
                     },
                 },
+                {
+                    $lookup: {
+                        from: StudentAttendance.collection.name,
+                        localField: '_id',
+                        foreignField: 'courseId',
+                        as: 'students',
+                    },
+                },
+                {
+                    $lookup: {
+                        from: TeacherAttendance.collection.name,
+                        localField: '_id',
+                        foreignField: 'courseId',
+                        as: 'teacher',
+                    },
+                },
+                {
+                    $unwind: '$teacher',
+                },
             ],
             (err, result) => {
                 if (err)
@@ -110,7 +151,7 @@ router.get(
                     )
                 return res.status(200).send({
                     success: true,
-                    data: result[0],
+                    data: result,
                 })
             }
         )
