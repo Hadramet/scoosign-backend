@@ -367,4 +367,285 @@ router.get(
         })
     }
 )
+router.get(
+    '/attendance/:attendanceId/certificate',
+    AdminAndAcademicPermissionHandler,
+    (req, res, next) => {
+        const attendanceId = req.params.attendanceId
+        Course.aggregate(
+            [
+                {
+                    $match: {
+                        _id: mongoose.Types.ObjectId(attendanceId),
+                    },
+                },
+                {
+                    $lookup: {
+                        from: Group.collection.name,
+                        let: {
+                            g: '$groups',
+                        },
+                        pipeline: [
+                            {
+                                $match: {
+                                    $expr: {
+                                        $in: ['$_id', '$$g'],
+                                    },
+                                },
+                            },
+                            {
+                                $project: {
+                                    _id: 1,
+                                    name: 1,
+                                },
+                            },
+                        ],
+                        as: 'groups',
+                    },
+                },
+                {
+                    $lookup: {
+                        from: Teacher.collection.name,
+                        let: { tid: '$teacher' },
+                        pipeline: [
+                            {
+                                $match: {
+                                    $expr: {
+                                        $eq: ['$_id', '$$tid'],
+                                    },
+                                },
+                            },
+                            {
+                                $lookup: {
+                                    from: User.collection.name,
+                                    localField: 'user',
+                                    foreignField: '_id',
+                                    as: 'user',
+                                },
+                            },
+                            {
+                                $unwind: '$user',
+                            },
+                            {
+                                $lookup: {
+                                    from: TeacherAttendance.collection.name,
+                                    let: {
+                                        cId: mongoose.Types.ObjectId(
+                                            attendanceId
+                                        ),
+                                    },
+                                    pipeline: [
+                                        {
+                                            $match: {
+                                                $expr: {
+                                                    $and: [
+                                                        {
+                                                            $eq: [
+                                                                '$teacherId',
+                                                                '$$tid',
+                                                            ],
+                                                        },
+                                                        {
+                                                            $eq: [
+                                                                '$courseId',
+                                                                '$$cId',
+                                                            ],
+                                                        },
+                                                    ],
+                                                },
+                                            },
+                                        },
+                                    ],
+                                    as: 'teacherAttendance',
+                                },
+                            },
+                            {
+                                $unwind: '$teacherAttendance',
+                            },
+                            {
+                                $project: {
+                                    userId: '$user._id',
+                                    specialty: 1,
+                                    firstName: '$user.firstName',
+                                    lastName: '$user.lastName',
+                                    email: '$user.email',
+                                    present: '$teacherAttendance.present',
+                                    comment: '$teacherAttendance.comment',
+                                },
+                            },
+                        ],
+                        as: 'teacher',
+                    },
+                },
+                {
+                    $unwind: '$teacher', //TODO: if multiple teacher can be added remove this
+                },
+                {
+                    $lookup: {
+                        from: StudentAttendance.collection.name,
+                        let: { cid: '$_id' },
+                        pipeline: [
+                            {
+                                $match: {
+                                    $expr: {
+                                        $and: [
+                                            { $eq: ['$courseId', '$$cid'] },
+                                            { $eq: ['$present', true] },
+                                        ],
+                                    },
+                                },
+                            },
+                            {
+                                $lookup: {
+                                    from: Student.collection.name,
+                                    let: { sId: '$studentId' },
+                                    pipeline: [
+                                        {
+                                            $match: {
+                                                $expr: {
+                                                    $eq: ['$_id', '$$sId'],
+                                                },
+                                            },
+                                        },
+                                    ],
+                                    as: 'student',
+                                },
+                            },
+                            {
+                                $unwind: '$student',
+                            },
+                            {
+                                $lookup: {
+                                    from: User.collection.name,
+                                    let: { uId: '$student.user' },
+                                    pipeline: [
+                                        {
+                                            $match: {
+                                                $expr: {
+                                                    $eq: ['$_id', '$$uId'],
+                                                },
+                                            },
+                                        },
+                                    ],
+                                    as: 'user',
+                                },
+                            },
+                            {
+                                $unwind: '$user',
+                            },
+                            {
+                                $project: {
+                                    firstName: '$user.firstName',
+                                    lastName: '$user.lastName',
+                                    present: 1,
+                                    studentId: '$studentId',
+                                    email: '$user.email',
+                                },
+                            },
+                        ],
+                        as: 'present',
+                    },
+                },
+                {
+                    $lookup: {
+                        from: StudentAttendance.collection.name,
+                        let: { cid: '$_id' },
+                        pipeline: [
+                            {
+                                $match: {
+                                    $expr: {
+                                        $and: [
+                                            { $eq: ['$courseId', '$$cid'] },
+                                            { $eq: ['$present', false] },
+                                        ],
+                                    },
+                                },
+                            },
+                            {
+                                $lookup: {
+                                    from: Student.collection.name,
+                                    let: { sId: '$studentId' },
+                                    pipeline: [
+                                        {
+                                            $match: {
+                                                $expr: {
+                                                    $eq: ['$_id', '$$sId'],
+                                                },
+                                            },
+                                        },
+                                    ],
+                                    as: 'student',
+                                },
+                            },
+                            {
+                                $unwind: '$student',
+                            },
+                            {
+                                $lookup: {
+                                    from: User.collection.name,
+                                    let: { uId: '$student.user' },
+                                    pipeline: [
+                                        {
+                                            $match: {
+                                                $expr: {
+                                                    $eq: ['$_id', '$$uId'],
+                                                },
+                                            },
+                                        },
+                                    ],
+                                    as: 'user',
+                                },
+                            },
+                            {
+                                $unwind: '$user',
+                            },
+                            {
+                                $project: {
+                                    firstName: '$user.firstName',
+                                    lastName: '$user.lastName',
+                                    present: 1,
+                                    studentId: '$studentId',
+                                    email: '$user.email',
+                                },
+                            },
+                        ],
+                        as: 'absent',
+                    },
+                },
+                {
+                    $addFields: {
+                        presentCount: { $size: '$present' },
+                        absentCount: { $size: '$absent' },
+                    },
+                },
+                {
+                    $addFields: {
+                        total: { $add: ['$presentCount', '$absentCount'] },
+                    },
+                },
+                {
+                    $addFields: {
+                        students: {
+                            $concatArrays: ['$present', '$absent'],
+                        },
+                    },
+                },
+                {
+                    $project: {
+                        present: 0,
+                        absent: 0,
+                    },
+                },
+            ],
+            (err, result) => {
+                if (err) return next(new ScooError(err?.message, 'student'))
+                return res.status(200).send({
+                    success: true,
+                    data: result[0],
+                })
+            }
+        )
+    }
+)
+
 export default router
