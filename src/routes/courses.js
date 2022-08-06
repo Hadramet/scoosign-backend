@@ -237,4 +237,134 @@ router.get('/', AdminAndAcademicPermissionHandler, (req, res, next) => {
         })
     })
 })
+
+router.get(
+    '/attendance/certificate',
+    AdminAndAcademicPermissionHandler,
+    (req, res, next) => {
+        const aggregateQuery = Course.aggregate([
+            {
+                $lookup: {
+                    from: Group.collection.name,
+                    let: {
+                        g: '$groups',
+                    },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $in: ['$_id', '$$g'],
+                                },
+                            },
+                        },
+                        {
+                            $project: {
+                                _id: 1,
+                                name: 1,
+                            },
+                        },
+                    ],
+                    as: 'groups',
+                },
+            },
+            {
+                $lookup: {
+                    from: Teacher.collection.name,
+                    let: { tid: '$teacher' },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $eq: ['$_id', '$$tid'],
+                                },
+                            },
+                        },
+                        {
+                            $lookup: {
+                                from: User.collection.name,
+                                localField: 'user',
+                                foreignField: '_id',
+                                as: 'user',
+                            },
+                        },
+                        {
+                            $unwind: '$user',
+                        },
+                        {
+                            $project: {
+                                userId: '$user._id',
+                                specialty: 1,
+                                firstName: '$user.firstName',
+                                lastName: '$user.lastName',
+                                email: '$user.email',
+                                active: '$user.active',
+                            },
+                        },
+                    ],
+                    as: 'teacher',
+                },
+            },
+            {
+                $unwind: '$teacher', //TODO: if multiple teacher can be added remove this
+            },
+            {
+                $lookup: {
+                    from: StudentAttendance.collection.name,
+                    let: { cid: '$_id' },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $and: [
+                                        { $eq: ['$courseId', '$$cid'] },
+                                        { $eq: ['$present', true] },
+                                    ],
+                                },
+                            },
+                        },
+                    ],
+                    as: 'present',
+                },
+            },
+            {
+                $lookup: {
+                    from: StudentAttendance.collection.name,
+                    let: { cid: '$_id' },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $and: [
+                                        { $eq: ['$courseId', '$$cid'] },
+                                        { $eq: ['$present', false] },
+                                    ],
+                                },
+                            },
+                        },
+                    ],
+                    as: 'absent',
+                },
+            },
+            {
+                $addFields: {
+                    present: { $size: '$present' },
+                    absent: { $size: '$absent' },
+                },
+            },
+            {
+                $addFields: {
+                    total: { $add: ['$present', '$absent'] },
+                },
+            },
+        ])
+        const options = getPaginatorDefaultOptions(req)
+        Course.aggregatePaginate(aggregateQuery, options, (err, result) => {
+            if (err) return next(new ScooError(err?.message, 'student'))
+            return res.status(200).send({
+                success: true,
+                data: result,
+            })
+        })
+    }
+)
 export default router
