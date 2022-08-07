@@ -356,6 +356,7 @@ router.get(
                     total: { $add: ['$present', '$absent'] },
                 },
             },
+            { $sort: { start: -1 } },
         ])
         const options = getPaginatorDefaultOptions(req)
         Course.aggregatePaginate(aggregateQuery, options, (err, result) => {
@@ -538,6 +539,7 @@ router.get(
                                     firstName: '$user.firstName',
                                     lastName: '$user.lastName',
                                     present: 1,
+                                    signedAt: 1,
                                     studentId: '$studentId',
                                     email: '$user.email',
                                 },
@@ -557,6 +559,27 @@ router.get(
                                         $and: [
                                             { $eq: ['$courseId', '$$cid'] },
                                             { $eq: ['$present', false] },
+                                            {
+                                                $or: [
+                                                    {
+                                                        $eq: [
+                                                            '$justify',
+                                                            false,
+                                                        ],
+                                                    },
+                                                    {
+                                                        $eq: [
+                                                            {
+                                                                $ifNull: [
+                                                                    '$justify',
+                                                                    false,
+                                                                ],
+                                                            },
+                                                            false,
+                                                        ],
+                                                    },
+                                                ],
+                                            },
                                         ],
                                     },
                                 },
@@ -604,6 +627,7 @@ router.get(
                                     firstName: '$user.firstName',
                                     lastName: '$user.lastName',
                                     present: 1,
+                                    justify: 1,
                                     studentId: '$studentId',
                                     email: '$user.email',
                                 },
@@ -613,20 +637,96 @@ router.get(
                     },
                 },
                 {
-                    $addFields: {
-                        presentCount: { $size: '$present' },
-                        absentCount: { $size: '$absent' },
+                    $lookup: {
+                        from: StudentAttendance.collection.name,
+                        let: { cid: '$_id' },
+                        pipeline: [
+                            {
+                                $match: {
+                                    $expr: {
+                                        $and: [
+                                            { $eq: ['$courseId', '$$cid'] },
+                                            { $eq: ['$present', false] },
+                                            { $eq: ['$justify', true] },
+                                        ],
+                                    },
+                                },
+                            },
+                            {
+                                $lookup: {
+                                    from: Student.collection.name,
+                                    let: { sId: '$studentId' },
+                                    pipeline: [
+                                        {
+                                            $match: {
+                                                $expr: {
+                                                    $eq: ['$_id', '$$sId'],
+                                                },
+                                            },
+                                        },
+                                    ],
+                                    as: 'student',
+                                },
+                            },
+                            {
+                                $unwind: '$student',
+                            },
+                            {
+                                $lookup: {
+                                    from: User.collection.name,
+                                    let: { uId: '$student.user' },
+                                    pipeline: [
+                                        {
+                                            $match: {
+                                                $expr: {
+                                                    $eq: ['$_id', '$$uId'],
+                                                },
+                                            },
+                                        },
+                                    ],
+                                    as: 'user',
+                                },
+                            },
+                            {
+                                $unwind: '$user',
+                            },
+                            {
+                                $project: {
+                                    firstName: '$user.firstName',
+                                    lastName: '$user.lastName',
+                                    present: 1,
+                                    justify: 1,
+                                    signedAt: 1,
+                                    studentId: '$studentId',
+                                    email: '$user.email',
+                                },
+                            },
+                        ],
+                        as: 'justify',
                     },
                 },
                 {
                     $addFields: {
-                        total: { $add: ['$presentCount', '$absentCount'] },
+                        presentCount: { $size: '$present' },
+                        absentCount: { $size: '$absent' },
+                        justifyCount: { $size: '$justify' },
+                    },
+                },
+                {
+                    $addFields: {
+                        total: {
+                            $add: [
+                                '$presentCount',
+                                '$absentCount',
+                                '$justifyCount',
+                            ],
+                        },
                     },
                 },
                 {
                     $addFields: {
                         students: {
-                            $concatArrays: ['$present', '$absent'],
+                            $concatArrays: ['$present', '$absent', '$justify'],
                         },
                     },
                 },
@@ -634,6 +734,7 @@ router.get(
                     $project: {
                         present: 0,
                         absent: 0,
+                        justify: 0,
                     },
                 },
             ],
@@ -648,4 +749,134 @@ router.get(
     }
 )
 
+router.patch(
+    '/:courseId/lock',
+    AdminAndAcademicPermissionHandler,
+    (req, res, next) => {
+        const courseId = req.params.courseId
+        Course.updateOne(
+            { _id: mongoose.Types.ObjectId(courseId) },
+            {
+                $set: {
+                    isLocked: true,
+                    link: 'http_link_here',
+                    locked_by: mongoose.Types.ObjectId(req.auth.uid),
+                },
+            },
+            {
+                strict: false,
+                upsert: true,
+            },
+            (err, result) => {
+                if (err) return next(new ScooError(err?.message, 'student'))
+                return res.status(200).send({
+                    success: true,
+                    data: result,
+                })
+            }
+        )
+    }
+)
+
+router.patch(
+    '/:courseId/studentPresent/:studentId',
+    AdminAndAcademicPermissionHandler,
+    (req, res, next) => {
+        const courseId = req.params.courseId
+        const studentId = req.params.studentId
+
+        StudentAttendance.updateOne(
+            {
+                studentId: mongoose.Types.ObjectId(studentId),
+                courseId: mongoose.Types.ObjectId(courseId),
+            },
+            {
+                $set: {
+                    present: true,
+                    signedAt: new Date(),
+                    updated_by: mongoose.Types.ObjectId(req.auth.uid),
+                },
+            },
+            {
+                strict: false,
+                upsert: true,
+            },
+            (err, result) => {
+                if (err) return next(new ScooError(err?.message, 'student'))
+                return res.status(200).send({
+                    success: true,
+                    data: result,
+                })
+            }
+        )
+    }
+)
+router.patch(
+    '/:courseId/studentAbsent/:studentId',
+    AdminAndAcademicPermissionHandler,
+    (req, res, next) => {
+        const courseId = req.params.courseId
+        const studentId = req.params.studentId
+
+        StudentAttendance.updateOne(
+            {
+                studentId: mongoose.Types.ObjectId(studentId),
+                courseId: mongoose.Types.ObjectId(courseId),
+            },
+            {
+                $set: {
+                    present: false,
+                    updated_by: mongoose.Types.ObjectId(req.auth.uid),
+                },
+            },
+            {
+                strict: false,
+                upsert: true,
+            },
+            (err, result) => {
+                if (err) return next(new ScooError(err?.message, 'student'))
+                return res.status(200).send({
+                    success: true,
+                    data: result,
+                })
+            }
+        )
+    }
+)
+
+router.patch(
+    '/:courseId/studentJustify/:studentId',
+    AdminAndAcademicPermissionHandler,
+    (req, res, next) => {
+        const courseId = req.params.courseId
+        const studentId = req.params.studentId
+
+        StudentAttendance.updateOne(
+            {
+                studentId: mongoose.Types.ObjectId(studentId),
+                courseId: mongoose.Types.ObjectId(courseId),
+            },
+            {
+                $set: {
+                    present: false,
+                    justify: true,
+                    justifyLink: 'http_lik_here',
+                    signedAt: new Date(),
+                    updated_by: mongoose.Types.ObjectId(req.auth.uid),
+                },
+            },
+            {
+                strict: false,
+                upsert: true,
+            },
+            (err, result) => {
+                if (err) return next(new ScooError(err?.message, 'student'))
+                return res.status(200).send({
+                    success: true,
+                    data: result,
+                })
+            }
+        )
+    }
+)
 export default router
