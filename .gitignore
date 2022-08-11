@@ -7,10 +7,11 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# local env files
-.env*.local
-
 # vercel
 .vercel
 models/seed.mongodb
 .vscode/settings.json
+
+.env*
+!.env.project
+!.env.vault
