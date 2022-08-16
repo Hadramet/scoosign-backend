@@ -8,6 +8,16 @@ function AdminPermission(req, next) {
     }
 }
 
+function TeacherPermission(req, next) {
+    if (!req.auth.uid || req.auth.urole !== 'teacher') {
+        next(
+            new Error('Only teacher user are authorize to proceed this request')
+        )
+    } else {
+        next()
+    }
+}
+
 function AdminAndAcademicPermission(req, next) {
     if (!req.auth.uid) return next(new ScooError('Unauthorize user', 'request'))
     if (req.auth.urole !== 'academic') {
@@ -37,6 +47,18 @@ export function AdminPermissionHandler(req, res, next) {
 export function AdminAndAcademicPermissionHandler(req, res, next) {
     try {
         AdminAndAcademicPermission(req, next)
+    } catch (error) {
+        res.status(error.statusCode || 500).send({
+            success: false,
+            failed: 'request',
+            message: error.message || 'Internal server error',
+        })
+    }
+}
+
+export function TeacherPermissionHandler(req, res, next) {
+    try {
+        TeacherPermission(req, next)
     } catch (error) {
         res.status(error.statusCode || 500).send({
             success: false,
