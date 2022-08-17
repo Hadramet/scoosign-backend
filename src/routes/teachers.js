@@ -8,7 +8,7 @@ import {
 } from '../middleware/admin-authority.js'
 import ScooError from '../errors/scoo-error.js'
 import { getPaginatorDefaultOptions } from '../aggregation/get-paginator-default.js'
-import { TeacherAttendance } from '../models/course.js'
+import { Course, TeacherAttendance } from '../models/course.js'
 import mongoose from 'mongoose'
 const router = express.Router()
 
@@ -272,4 +272,166 @@ router.get('/stats/basic', TeacherPermissionHandler, (req, res, next) => {
     )
 })
 
+/**
+ *  {
+ *      _id: 'xxxxxx',
+ *      courses : [
+ *          {
+ *              _id: "dqfoidsqfod",
+                name: "4MERN ",
+                room: "D44",
+                description: "description",
+                date: subHours(Date.now(), 22).getTime(),
+                students: [],
+                isSigned: true,
+ *          }
+ *      ]    
+ *  }
+ */
+
+router.get('/courses/daily', TeacherPermissionHandler, (req, res, next) => {
+    const teacherId = req.auth.uid
+    const interval_start = new Date()
+    const interval_end = new Date()
+
+    interval_start.setHours(8)
+    interval_start.setMinutes(0)
+
+    interval_end.setHours(23)
+    interval_end.setMinutes(50)
+
+    console.log(interval_start)
+    console.log(interval_end)
+
+    Teacher.aggregate(
+        [
+            {
+                $match: {
+                    user: mongoose.Types.ObjectId(teacherId),
+                },
+            },
+            {
+                $lookup: {
+                    from: TeacherAttendance.collection.name,
+                    let: {
+                        uid: '$_id',
+                    },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $and: [
+                                        {
+                                            $eq: ['$teacherId', '$$uid'],
+                                        },
+                                    ],
+                                },
+                            },
+                        },
+                        {
+                            $lookup: {
+                                from: 'courses',
+                                let: {
+                                    cid: '$courseId',
+                                },
+                                pipeline: [
+                                    {
+                                        $match: {
+                                            $expr: {
+                                                $and: [
+                                                    {
+                                                        $eq: ['$_id', '$$cid'],
+                                                    },
+                                                    {
+                                                        $gte: [
+                                                            '$start',
+                                                            interval_start,
+                                                        ],
+                                                    },
+                                                    {
+                                                        $lte: [
+                                                            '$start',
+                                                            interval_end,
+                                                        ],
+                                                    },
+                                                ],
+                                            },
+                                        },
+                                    },
+                                    {
+                                        $lookup: {
+                                            from: 'students',
+                                            let: {
+                                                sts: '$students',
+                                            },
+                                            pipeline: [
+                                                {
+                                                    $match: {
+                                                        $expr: {
+                                                            $in: [
+                                                                '$_id',
+                                                                '$$sts',
+                                                            ],
+                                                        },
+                                                    },
+                                                },
+                                                {
+                                                    $lookup: {
+                                                        from: 'users',
+                                                        foreignField: '_id',
+                                                        localField: 'user',
+                                                        as: 'user',
+                                                    },
+                                                },
+                                                {
+                                                    $unwind: '$user',
+                                                },
+                                                {
+                                                    $project: {
+                                                        'user.firstName': 1,
+                                                        'user.lastName': 1,
+                                                        'user.email': 1,
+                                                    },
+                                                },
+                                            ],
+                                            as: 'students',
+                                        },
+                                    },
+                                ],
+                                as: 'course',
+                            },
+                        },
+                        {
+                            $unwind: '$course',
+                        },
+                        {
+                            $project: {
+                                name: '$course.name',
+                                room: '$course.classRoom',
+                                description: '$course.description',
+                                start: '$course.start',
+                                end: '$course.end',
+                                isSigned: '$course.isLocked',
+                                students: '$course.students',
+                            },
+                        },
+                    ],
+                    as: 'dailyCourses',
+                },
+            },
+            {
+                $project: {
+                    dailyCourses: 1,
+                },
+            },
+        ],
+        (err, result) => {
+            if (err) return next(new ScooError(err?.message, 'teacher'))
+            return res.status(200).send({
+                success: true,
+                data: result,
+            })
+        }
+    )
+})
 export default router
