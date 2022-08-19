@@ -2,7 +2,10 @@ import express from 'express'
 import mongoose from 'mongoose'
 import { getPaginatorDefaultOptions } from '../aggregation/get-paginator-default.js'
 import ScooError from '../errors/scoo-error.js'
-import { AdminAndAcademicPermissionHandler } from '../middleware/admin-authority.js'
+import {
+    AdminAcademicAndTeacherPermissionHandler,
+    AdminAndAcademicPermissionHandler,
+} from '../middleware/admin-authority.js'
 import {
     Course,
     StudentAttendance,
@@ -751,7 +754,7 @@ router.get(
 
 router.patch(
     '/:courseId/lock',
-    AdminAndAcademicPermissionHandler,
+    AdminAcademicAndTeacherPermissionHandler,
     (req, res, next) => {
         const courseId = req.params.courseId
         Course.updateOne(
@@ -780,7 +783,7 @@ router.patch(
 
 router.patch(
     '/:courseId/studentPresent/:studentId',
-    AdminAndAcademicPermissionHandler,
+    AdminAcademicAndTeacherPermissionHandler,
     (req, res, next) => {
         const courseId = req.params.courseId
         const studentId = req.params.studentId
@@ -813,7 +816,7 @@ router.patch(
 )
 router.patch(
     '/:courseId/studentAbsent/:studentId',
-    AdminAndAcademicPermissionHandler,
+    AdminAcademicAndTeacherPermissionHandler,
     (req, res, next) => {
         const courseId = req.params.courseId
         const studentId = req.params.studentId
@@ -846,7 +849,7 @@ router.patch(
 
 router.patch(
     '/:courseId/studentJustify/:studentId',
-    AdminAndAcademicPermissionHandler,
+    AdminAcademicAndTeacherPermissionHandler,
     (req, res, next) => {
         const courseId = req.params.courseId
         const studentId = req.params.studentId
