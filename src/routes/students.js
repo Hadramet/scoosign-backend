@@ -1,12 +1,16 @@
 import express from 'express'
 import ScooError from '../errors/scoo-error.js'
-import { AdminAndAcademicPermissionHandler } from '../middleware/admin-authority.js'
+import {
+    AdminAndAcademicPermissionHandler,
+    StudentPermissionHandler,
+} from '../middleware/admin-authority.js'
 import { Student } from '../models/student.js'
 import { User } from '../models/user.js'
 import { getPaginatorDefaultOptions } from '../aggregation/get-paginator-default.js'
 import { getStudentAgg } from '../aggregation/get-student-list-agg.js'
 import { Group } from '../models/group.js'
 import mongoose from 'mongoose'
+import { StudentAttendance } from '../models/course.js'
 
 const router = express.Router()
 
@@ -227,5 +231,182 @@ router.patch(
         )
     }
 )
+
+router.get('/stats/basic', StudentPermissionHandler, (req, res, next) => {
+    const studentId = req.auth.uid
+    Student.aggregate(
+        [
+            {
+                $match: {
+                    user: mongoose.Types.ObjectId(studentId.toString()),
+                },
+            },
+            {
+                $lookup: {
+                    from: StudentAttendance.collection.name,
+                    let: {
+                        uid: '$_id',
+                    },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $and: [
+                                        {
+                                            $eq: ['$studentId', '$$uid'],
+                                        },
+                                        {
+                                            $eq: ['$present', true],
+                                        },
+                                    ],
+                                },
+                            },
+                        },
+                    ],
+                    as: 'pres_att',
+                },
+            },
+            {
+                $lookup: {
+                    from: StudentAttendance.collection.name,
+                    let: {
+                        uid: '$_id',
+                    },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $and: [
+                                        {
+                                            $eq: ['$studentId', '$$uid'],
+                                        },
+                                        {
+                                            $eq: ['$present', false],
+                                        },
+                                    ],
+                                },
+                            },
+                        },
+                    ],
+                    as: 'abs_att',
+                },
+            },
+            {
+                $lookup: {
+                    from: StudentAttendance.collection.name,
+                    let: {
+                        uid: '$_id',
+                    },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $and: [
+                                        {
+                                            $eq: ['$studentId', '$$uid'],
+                                        },
+                                        {
+                                            $eq: ['$present', false],
+                                        },
+                                        {
+                                            $eq: ['$justify', true],
+                                        },
+                                    ],
+                                },
+                            },
+                        },
+                    ],
+                    as: 'just_att',
+                },
+            },
+            {
+                $addFields: {
+                    presentCount: {
+                        $size: '$pres_att',
+                    },
+                    absentCount: {
+                        $size: '$abs_att',
+                    },
+                    justifyCount: {
+                        $size: '$just_att',
+                    },
+                },
+            },
+            {
+                $addFields: {
+                    total: {
+                        $add: [
+                            '$presentCount',
+                            '$absentCount',
+                            '$justifyCount',
+                        ],
+                    },
+                },
+            },
+            {
+                $addFields: {
+                    pres_perct: {
+                        $divide: ['$presentCount', '$total'],
+                    },
+                    abs_perct: {
+                        $divide: ['$absentCount', '$total'],
+                    },
+                    just_perct: {
+                        $divide: ['$justifyCount', '$total'],
+                    },
+                },
+            },
+            {
+                $addFields: {
+                    pres_perct: {
+                        $multiply: ['$pres_perct', 100],
+                    },
+                    abs_perct: {
+                        $multiply: ['$abs_perct', 100],
+                    },
+                    just_perct: {
+                        $multiply: ['$just_perct', 100],
+                    },
+                },
+            },
+            {
+                $addFields: {
+                    items: [
+                        {
+                            color: '#4CAF50',
+                            label: 'Presence',
+                            subtitle: 'Course attended',
+                            value: { $round: ['$pres_perct', 2] },
+                        },
+                        {
+                            color: '#FF9800',
+                            label: 'Justify',
+                            subtitle: 'Justify absence(s)',
+                            value: { $round: ['$just_perct', 2] },
+                        },
+                        {
+                            color: '#F44336',
+                            label: 'Absence ',
+                            subtitle: 'Time(s)',
+                            value: { $round: ['$abs_perct', 2] },
+                        },
+                    ],
+                },
+            },
+            {
+                $project: {
+                    items: 1,
+                },
+            },
+        ],
+        (err, result) => {
+            if (err) return next(new ScooError(err?.message, 'teacher'))
+            return res.status(200).send({
+                success: true,
+                data: result[0],
+            })
+        }
+    )
+})
 
 export default router

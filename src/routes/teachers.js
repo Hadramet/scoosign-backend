@@ -278,23 +278,6 @@ router.get('/stats/basic', TeacherPermissionHandler, (req, res, next) => {
     )
 })
 
-/**
- *  {
- *      _id: 'xxxxxx',
- *      courses : [
- *          {
- *              _id: "dqfoidsqfod",
-                name: "4MERN ",
-                room: "D44",
-                description: "description",
-                date: subHours(Date.now(), 22).getTime(),
-                students: [],
-                isSigned: true,
- *          }
- *      ]    
- *  }
- */
-
 router.get('/courses/daily', TeacherPermissionHandler, (req, res, next) => {
     const teacherId = req.auth.uid
     const interval_start = new Date()
