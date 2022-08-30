@@ -215,13 +215,13 @@ router.get('/stats/basic', TeacherPermissionHandler, (req, res, next) => {
             {
                 $addFields: {
                     pres_perct: {
-                        $divide: ['$presentCount', '$total'],
+                        $cond : { if : {$gt: ['$total', 0]}, then: { $divide: ['$presentCount', '$total']}, else:0 },
                     },
                     abs_perct: {
-                        $divide: ['$absentCount', '$total'],
+                        $cond : { if : {$gt: ['$total', 0]}, then: { $divide: ['$absentCount', '$total']}, else:0 },
                     },
                     just_perct: {
-                        $divide: ['$justifyCount', '$total'],
+                        $cond : { if : {$gt: ['$total', 0]}, then: { $divide: ['$justifyCount', '$total']}, else:0 },
                     },
                 },
             },
